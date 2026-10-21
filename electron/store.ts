@@ -92,7 +92,7 @@ export const store = {
   saveProduct: (input: Partial<Product>) => mutate(data => {
     const name = cleanText(input.name, 'Nome')
     const salePrice = validMoney(input.salePrice, 'Preço de venda')
-    const costPrice = input.costPrice === null || input.costPrice === undefined || input.costPrice === ('' as unknown)
+    const costPrice = input.costPrice === null || input.costPrice === undefined
       ? null : validMoney(input.costPrice, 'Preço de custo', true)
     const stock = Number(input.stock ?? 0)
     if (!Number.isFinite(stock) || stock < 0) throw new Error('Estoque deve ser zero ou maior.')
