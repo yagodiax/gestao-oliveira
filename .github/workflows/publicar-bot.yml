@@ -1,0 +1,66 @@
+name: Publicar alteracoes do bot
+
+on:
+  push:
+    branches:
+      - bot-staging
+    paths-ignore:
+      - ".github/workflows/publicar-bot.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar-bot-main
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    if: github.repository == 'yagodiax/gestao-oliveira'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Buscar branch de desenvolvimento
+        run: git fetch origin bot-staging
+
+      - name: Aplicar somente arquivos alterados na branch de desenvolvimento
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status origin/main...origin/bot-staging > /tmp/changed-files.txt
+          if [ ! -s /tmp/changed-files.txt ]; then
+            echo "Nenhuma alteracao nova para publicar."
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r status path extra; do
+            case "$status" in
+              D)
+                git rm -f -- "$path" || true
+                ;;
+              A|M|R*)
+                git checkout origin/bot-staging -- "$path"
+                git add -A -- "$path"
+                ;;
+              *)
+                echo "Status nao suportado: $status $path"
+                exit 1
+                ;;
+            esac
+          done < /tmp/changed-files.txt
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma diferenca restante para publicar."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: publicar alteracoes automatizadas"
+          git push origin HEAD:main
