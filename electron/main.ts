@@ -83,7 +83,7 @@ function escapeHtml(value: unknown) {
 }
 
 ipcMain.handle('receipt:print', async (_event, sale: {
-  number: number; createdAt: string; items: { name: string; quantity: number; unitPrice: number }[];
+  number: number; createdAt: string; status: 'concluida' | 'cancelada'; items: { name: string; quantity: number; unitPrice: number }[];
   payments: { method: string; amount: number }[]; total: number;
 }) => {
   const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -95,8 +95,9 @@ ipcMain.handle('receipt:print', async (_event, sale: {
     h1{font-size:18px;text-align:center;margin:0 0 5px}p{text-align:center;margin:3px 0}.muted{font-size:9px}
     .rule{border-top:1px dashed #000;margin:9px 0}.line{display:flex;justify-content:space-between;gap:8px;margin:4px 0}
     table{width:100%;border-collapse:collapse}td{padding:3px 0;vertical-align:top}td.right{text-align:right;white-space:nowrap}
-    .total{font-size:15px;font-weight:bold}.footer{text-align:center;line-height:1.5;margin-top:12px}
+    .total{font-size:15px;font-weight:bold}.cancelled{font-weight:bold;text-align:center;border:2px solid #000;padding:6px 2px}.footer{text-align:center;line-height:1.5;margin-top:12px}
   </style></head><body><h1>Mercearia Oliveira</h1><p>COMPROVANTE DE VENDA</p><p class="muted">Não é documento fiscal</p><div class="rule"></div>
+  ${sale.status === 'cancelada' ? '<p class="cancelled">*** VENDA CANCELADA ***</p><div class="rule"></div>' : ''}
   <div class="line"><span>Venda</span><strong>#${String(sale.number).padStart(6,'0')}</strong></div><div class="line"><span>Data</span><span>${escapeHtml(date)}</span></div>
   <div class="rule"></div><strong>PRODUTOS</strong><table>${rows}</table><div class="rule"></div>
   <div class="line total"><span>TOTAL</span><span>${money(sale.total)}</span></div><div class="rule"></div><strong>PAGAMENTO</strong>${payments}
