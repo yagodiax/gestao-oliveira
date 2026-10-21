@@ -12,6 +12,7 @@ declare global {
       cancelSale: (id: string) => Promise<Sale>
       openCash: (openingAmount: number) => Promise<CashSession>
       closeCash: () => Promise<{ session: CashSession; salesCount: number; salesTotal: number; byPayment: Record<Payment['method'], number> }>
+      printReceipt: (sale: Sale) => Promise<{ success: boolean; error?: string }>
     }
   }
 }
