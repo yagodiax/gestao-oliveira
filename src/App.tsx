@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Product, Sale, StoreData, Payment } from '../electron/store'
 import './App.css'
 
@@ -144,7 +144,7 @@ function App() {
   </div>
 }
 
-function Heading({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) { return <div className="page-heading"><div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div> }
+function Heading({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) { return <div className="page-heading"><div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div> }
 function PanelTitle({ title }: { title: string }) { return <div className="panel-heading"><h2>{title}</h2></div> }
 function Stat({ label, value, note }: { label: string; value: string; note: string }) { return <article className="stat-card"><span>{label}</span><strong>{value}</strong><small>{note}</small></article> }
 function Shortcut({ title, text, onClick }: { title: string; text: string; onClick: () => void }) { return <button className="shortcut" onClick={onClick}><span className="shortcut-icon">↗</span><span><strong>{title}</strong><small>{text}</small></span><span className="arrow">→</span></button> }
