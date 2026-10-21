@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import './App.css'
 
 type Page = 'Início' | 'Frente de caixa' | 'Produtos' | 'Vendas' | 'Relatórios' | 'Caixa'
@@ -61,7 +61,7 @@ function App() {
   )
 }
 
-function PageHeading({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) {
+function PageHeading({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
   return <div className="page-heading"><div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>
 }
 
