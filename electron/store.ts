@@ -25,6 +25,14 @@ export type Sale = {
   total: number
   status: 'concluida' | 'cancelada'
   cancelledAt?: string
+  cashSessionId?: string
+}
+export type CashSummary = {
+  salesCount: number
+  salesTotal: number
+  estimatedCost: number
+  estimatedProfit: number
+  byPayment: Record<Payment['method'], number>
 }
 export type CashSession = {
   id: string
@@ -32,8 +40,16 @@ export type CashSession = {
   openingAmount: number
   closedAt?: string
   closingAmount?: number
+  summary?: CashSummary
 }
-export type StoreData = { version: 1; products: Product[]; sales: Sale[]; cashSession: CashSession | null; nextSaleNumber: number }
+export type StoreData = {
+  version: 1
+  products: Product[]
+  sales: Sale[]
+  cashSession: CashSession | null
+  cashSessions: CashSession[]
+  nextSaleNumber: number
+}
 
 const filePath = () => path.join(app.getPath('userData'), 'gestao-oliveira.json')
 let queue = Promise.resolve()
@@ -41,12 +57,23 @@ let queue = Promise.resolve()
 async function readData(): Promise<StoreData> {
   try {
     const raw = await fs.readFile(filePath(), 'utf8')
-    const parsed = JSON.parse(raw) as StoreData
+    const parsed = JSON.parse(raw) as Partial<StoreData>
     if (parsed.version !== 1 || !Array.isArray(parsed.products) || !Array.isArray(parsed.sales)) throw new Error('Arquivo de dados inválido.')
-    return parsed
+    const sessions = Array.isArray(parsed.cashSessions) ? parsed.cashSessions : []
+    const current = parsed.cashSession || null
+    if (current && !sessions.some(session => session.id === current.id)) sessions.push(current)
+    const data: StoreData = {
+      version: 1,
+      products: parsed.products,
+      sales: parsed.sales,
+      cashSession: current,
+      cashSessions: sessions,
+      nextSaleNumber: Number(parsed.nextSaleNumber) || Math.max(0, ...parsed.sales.map(sale => Number(sale.number) || 0)) + 1,
+    }
+    return data
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const initial: StoreData = { version: 1, products: [], sales: [], cashSession: null, nextSaleNumber: 1 }
+    const initial: StoreData = { version: 1, products: [], sales: [], cashSession: null, cashSessions: [], nextSaleNumber: 1 }
     await writeData(initial)
     return initial
   }
@@ -56,24 +83,17 @@ async function writeData(data: StoreData) {
   const target = filePath()
   const directory = path.dirname(target)
   await fs.mkdir(directory, { recursive: true })
-
-  // Guarda uma cópia do estado anterior antes de substituir o arquivo principal.
   try {
     await fs.access(target)
     const backupDirectory = path.join(directory, 'backups')
     await fs.mkdir(backupDirectory, { recursive: true })
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     await fs.copyFile(target, path.join(backupDirectory, `gestao-oliveira-${stamp}.json`))
-    const backups = (await fs.readdir(backupDirectory))
-      .filter(name => name.startsWith('gestao-oliveira-') && name.endsWith('.json'))
-      .sort()
-    for (const oldBackup of backups.slice(0, Math.max(0, backups.length - 7))) {
-      await fs.unlink(path.join(backupDirectory, oldBackup))
-    }
+    const backups = (await fs.readdir(backupDirectory)).filter(name => name.startsWith('gestao-oliveira-') && name.endsWith('.json')).sort()
+    for (const oldBackup of backups.slice(0, Math.max(0, backups.length - 7))) await fs.unlink(path.join(backupDirectory, oldBackup))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-
   const temporary = target + '.tmp'
   await fs.writeFile(temporary, JSON.stringify(data, null, 2), 'utf8')
   await fs.rename(temporary, target)
@@ -105,14 +125,39 @@ const validMoney = (value: unknown, label: string, allowZero = false) => {
   if (!Number.isFinite(n) || (allowZero ? n < 0 : n <= 0)) throw new Error(label + ' inválido.')
   return roundMoney(n)
 }
+const emptyPaymentTotals = (): Record<Payment['method'], number> => ({ Dinheiro: 0, Crédito: 0, Débito: 0, Pix: 0 })
+function summarizeSales(sales: Sale[]): CashSummary {
+  const summary: CashSummary = { salesCount: sales.length, salesTotal: 0, estimatedCost: 0, estimatedProfit: 0, byPayment: emptyPaymentTotals() }
+  for (const sale of sales) {
+    summary.salesTotal += sale.total
+    for (const payment of sale.payments) summary.byPayment[payment.method] += payment.amount
+    for (const item of sale.items) {
+      if (item.costPrice !== null && Number.isFinite(item.costPrice)) {
+        summary.estimatedCost += item.costPrice * item.quantity
+        summary.estimatedProfit += (item.unitPrice - item.costPrice) * item.quantity
+      }
+    }
+  }
+  summary.salesTotal = roundMoney(summary.salesTotal)
+  summary.estimatedCost = roundMoney(summary.estimatedCost)
+  summary.estimatedProfit = roundMoney(summary.estimatedProfit)
+  for (const method of Object.keys(summary.byPayment) as Payment['method'][]) summary.byPayment[method] = roundMoney(summary.byPayment[method])
+  return summary
+}
+function salesForSession(data: StoreData, session: CashSession): Sale[] {
+  return data.sales.filter(sale => sale.status === 'concluida' && (
+    sale.cashSessionId
+      ? sale.cashSessionId === session.id
+      : sale.createdAt >= session.openedAt && (!session.closedAt || sale.createdAt <= session.closedAt)
+  ))
+}
 
 export const store = {
   getState: () => readData(),
   saveProduct: (input: Partial<Product>) => mutate(data => {
     const name = cleanText(input.name, 'Nome')
     const salePrice = validMoney(input.salePrice, 'Preço de venda')
-    const costPrice = input.costPrice === null || input.costPrice === undefined
-      ? null : validMoney(input.costPrice, 'Preço de custo', true)
+    const costPrice = input.costPrice === null || input.costPrice === undefined ? null : validMoney(input.costPrice, 'Preço de custo', true)
     const stock = Number(input.stock ?? 0)
     if (!Number.isFinite(stock) || stock < 0) throw new Error('Estoque deve ser zero ou maior.')
     const id = input.id || crypto.randomUUID()
@@ -159,7 +204,7 @@ export const store = {
       const product = data.products.find(p => p.id === item.productId)!
       product.stock -= item.quantity
     }
-    const sale: Sale = { id: crypto.randomUUID(), number: data.nextSaleNumber++, createdAt: new Date().toISOString(), items, payments, total, status: 'concluida' }
+    const sale: Sale = { id: crypto.randomUUID(), number: data.nextSaleNumber++, createdAt: new Date().toISOString(), items, payments, total, status: 'concluida', cashSessionId: data.cashSession.id }
     data.sales.unshift(sale)
     return sale
   }),
@@ -179,20 +224,19 @@ export const store = {
     if (data.cashSession && !data.cashSession.closedAt) throw new Error('O caixa já está aberto.')
     const amount = Number(openingAmount)
     if (!Number.isFinite(amount) || amount < 0) throw new Error('Valor inicial inválido.')
-    data.cashSession = { id: crypto.randomUUID(), openedAt: new Date().toISOString(), openingAmount: roundMoney(amount) }
-    return data.cashSession
+    const session: CashSession = { id: crypto.randomUUID(), openedAt: new Date().toISOString(), openingAmount: roundMoney(amount) }
+    data.cashSession = session
+    data.cashSessions = [...data.cashSessions.filter(old => old.id !== session.id), session]
+    return session
   }),
   closeCash: () => mutate(data => {
     if (!data.cashSession || data.cashSession.closedAt) throw new Error('Não existe caixa aberto.')
-    data.cashSession.closedAt = new Date().toISOString()
-    const sales = data.sales.filter(s => s.status === 'concluida' && s.createdAt >= data.cashSession!.openedAt)
-    const cashSales = sales.flatMap(s => s.payments).filter(p => p.method === 'Dinheiro').reduce((sum, p) => sum + p.amount, 0)
-    data.cashSession.closingAmount = roundMoney(data.cashSession.openingAmount + cashSales)
-    return { session: data.cashSession, salesCount: sales.length, salesTotal: roundMoney(sales.reduce((sum, s) => sum + s.total, 0)), byPayment: {
-      Dinheiro: roundMoney(sales.flatMap(s => s.payments).filter(p => p.method === 'Dinheiro').reduce((sum, p) => sum + p.amount, 0)),
-      Crédito: roundMoney(sales.flatMap(s => s.payments).filter(p => p.method === 'Crédito').reduce((sum, p) => sum + p.amount, 0)),
-      Débito: roundMoney(sales.flatMap(s => s.payments).filter(p => p.method === 'Débito').reduce((sum, p) => sum + p.amount, 0)),
-      Pix: roundMoney(sales.flatMap(s => s.payments).filter(p => p.method === 'Pix').reduce((sum, p) => sum + p.amount, 0)),
-    } }
+    const session = data.cashSession
+    session.closedAt = new Date().toISOString()
+    const sales = salesForSession(data, session)
+    session.summary = summarizeSales(sales)
+    session.closingAmount = roundMoney(session.openingAmount + session.summary.byPayment.Dinheiro)
+    data.cashSessions = data.cashSessions.map(old => old.id === session.id ? { ...session } : old)
+    return { session, ...session.summary }
   }),
 }

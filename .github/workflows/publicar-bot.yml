@@ -64,3 +64,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: publicar alteracoes automatizadas"
           git push origin HEAD:main
+          git push --force-with-lease=refs/heads/bot-staging:$STAGING_SHA origin HEAD:bot-staging || echo "A branch recebeu novas alteracoes durante a publicacao; mantida para a proxima execucao."
