@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
+import { store } from './store'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -64,5 +65,13 @@ app.on('activate', () => {
     createWindow()
   }
 })
+
+ipcMain.handle('store:get-state', () => store.getState())
+ipcMain.handle('product:save', (_event, input) => store.saveProduct(input))
+ipcMain.handle('product:delete', (_event, id: string) => store.deleteProduct(id))
+ipcMain.handle('sale:finalize', (_event, input) => store.finalizeSale(input))
+ipcMain.handle('sale:cancel', (_event, id: string) => store.cancelSale(id))
+ipcMain.handle('cash:open', (_event, amount: number) => store.openCash(amount))
+ipcMain.handle('cash:close', () => store.closeCash())
 
 app.whenReady().then(createWindow)
