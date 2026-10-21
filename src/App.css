@@ -56,3 +56,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:650px){.cash-live-grid{grid-template-columns:1fr}.cash-history-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cash-history-head{align-items:flex-start}}
 
 /* resumo diario do caixa: historico de fechamento */
+
+
+/* Detalhes das vendas dentro de cada fechamento de caixa */
+.cash-details-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.cash-sale-details{display:grid;gap:10px;margin-top:12px}
+.cash-sale-card{padding:13px;border:1px solid #383932;border-radius:9px;background:#1a1b19}
+.cash-sale-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.cash-sale-title>div:first-child{display:flex;flex-direction:column;gap:5px}
+.cash-sale-title small{font-size:10px;color:#85877f}
+.cash-sale-total{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.cash-sale-total>strong{font-size:15px}
+.cash-sale-items{margin-top:10px;border-top:1px solid #33342f}
+.cash-sale-item{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid #2b2c28;font-size:11px}
+.cash-sale-item>span{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+.cash-sale-item small{font-size:10px;color:#85877f}
+.cash-sale-item>strong{white-space:nowrap}
+.cash-sale-payments{margin-top:10px;color:#a4a69e;font-size:10px;line-height:1.6}
+.modal input[type="text"]{cursor:text;user-select:text;-webkit-user-select:text;pointer-events:auto}
+@media(max-width:650px){.cash-sale-title{align-items:flex-start}.cash-details-actions{justify-content:stretch}.cash-details-actions button{width:100%}}
