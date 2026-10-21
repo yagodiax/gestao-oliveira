@@ -25,6 +25,13 @@ function App() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [checkout, setCheckout] = useState(false)
   const [checkoutPayments, setCheckoutPayments] = useState<Payment[]>([])
+  const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
+  const [receiptCustomerName, setReceiptCustomerName] = useState('')
+  const [receiptIsFiado, setReceiptIsFiado] = useState(false)
+  const [receiptCopies, setReceiptCopies] = useState<'loja' | 'loja-cliente'>('loja')
+  const [diversosModal, setDiversosModal] = useState(false)
+  const [diversosDescription, setDiversosDescription] = useState('')
+  const [diversosPrice, setDiversosPrice] = useState('')
   const [openingAmount, setOpeningAmount] = useState('0')
   const [productForm, setProductForm] = useState({ name: '', category: 'Geral', costPrice: '', salePrice: '', stock: '0', unit: 'un' })
 
@@ -83,13 +90,19 @@ function App() {
   }
 
   const addDiversos = () => {
-    const description = window.prompt('Descrição do item (ex.: produto sem cadastro):')
-    if (!description?.trim()) return
-    const raw = window.prompt('Valor total deste item (R$):')
-    if (raw === null) return
-    const value = Number(raw.replace(',', '.'))
+    setDiversosDescription('')
+    setDiversosPrice('')
+    setDiversosModal(true)
+  }
+
+  const confirmDiversos = (event: FormEvent) => {
+    event.preventDefault()
+    const description = diversosDescription.trim()
+    const value = Number(diversosPrice.replace(',', '.'))
+    if (!description) { setError('Informe a descrição do item Diversos.'); return }
     if (!Number.isFinite(value) || value <= 0) { setError('Informe um valor válido para Diversos.'); return }
-    setCart(items => [...items, { key: crypto.randomUUID(), productId: null, name: 'Diversos — ' + description.trim(), quantity: 1, unitPrice: Math.round(value * 100) / 100 }])
+    setCart(items => [...items, { key: crypto.randomUUID(), productId: null, name: 'Diversos — ' + description, quantity: 1, unitPrice: Math.round(value * 100) / 100 }])
+    setDiversosModal(false)
     setError('')
   }
 
@@ -99,12 +112,34 @@ function App() {
     setCheckout(true)
   }
 
-  const askReceiptOptions = () => {
-    const customerName = window.prompt('Nome do cliente para o comprovante:')
-    if (customerName === null) return null
-    const isFiado = window.confirm('Essa venda é FIADO?\\nOK = Sim · Cancelar = Não')
-    const copies = window.confirm('Imprimir uma via da loja E outra do cliente?\\nOK = Loja + cliente · Cancelar = Só a loja') ? 'loja-cliente' as const : 'loja' as const
-    return { customerName: customerName.trim() || 'Não informado', isFiado, copies }
+  const openReceiptOptions = (sale: Sale) => {
+    setReceiptSale(sale)
+    setReceiptCustomerName('')
+    setReceiptIsFiado(false)
+    setReceiptCopies('loja')
+  }
+
+  const confirmReceiptPrint = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!receiptSale) return
+    try {
+      const result = await window.loja.printReceipt(receiptSale, {
+        customerName: receiptCustomerName.trim() || 'Não informado',
+        isFiado: receiptIsFiado,
+        copies: receiptCopies,
+      })
+      if (result.success) {
+        setNotice('Comprovante da venda #' + receiptSale.number + ' enviado para impressão.')
+        setError('')
+        setReceiptSale(null)
+      } else {
+        setError('Não foi possível imprimir: ' + (result.error || 'verifique a impressora.'))
+        setNotice('')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível imprimir o comprovante.')
+      setNotice('')
+    }
   }
 
   const confirmSale = async () => {
@@ -113,26 +148,13 @@ function App() {
       setCart([]); setCheckout(false); setPage('Vendas'); setNotice('Venda registrada com sucesso.'); setError('')
       await refresh()
       if (window.confirm('Venda registrada! Deseja imprimir o comprovante?')) {
-        const options = askReceiptOptions()
-        if (!options) { setNotice('Venda registrada. Impressão cancelada.'); return }
-        const result = await window.loja.printReceipt(sale, options)
-        if (!result.success) setError('Venda salva, mas não foi possível imprimir: ' + (result.error || 'verifique a impressora.'))
-        else setNotice('Comprovante enviado para impressão.')
+        openReceiptOptions(sale)
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível registrar a venda.'); setNotice('') }
   }
 
   const printSale = async (sale: Sale) => {
-    try {
-      const options = askReceiptOptions()
-      if (!options) return
-      const result = await window.loja.printReceipt(sale, options)
-      if (result.success) { setNotice('Comprovante da venda #' + sale.number + ' enviado para impressão.'); setError('') }
-      else { setError('Não foi possível imprimir: ' + (result.error || 'verifique a impressora.')); setNotice('') }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Não foi possível imprimir o comprovante.')
-      setNotice('')
-    }
+    openReceiptOptions(sale)
   }
 
   const cancelSale = async (sale: Sale) => {
@@ -166,6 +188,8 @@ function App() {
         <footer className="page-footer">Gestão Oliveira · Aplicativo local</footer>
       </section>
     </main>
+    {receiptSale && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={confirmReceiptPrint}><div className="modal-heading"><h2>Opções do comprovante</h2><button type="button" className="icon-button" onClick={() => setReceiptSale(null)}>×</button></div><p className="muted">Venda #{String(receiptSale.number).padStart(6, '0')} · {money(receiptSale.total)}</p><label className="field-label">Nome do cliente<input autoFocus value={receiptCustomerName} onChange={e => setReceiptCustomerName(e.target.value)} placeholder="Nome para identificar o fiado (opcional)" /></label><label className="field-label">Tipo de venda<select value={receiptIsFiado ? 'fiado' : 'normal'} onChange={e => setReceiptIsFiado(e.target.value === 'fiado')}><option value="normal">Venda normal — não fiado</option><option value="fiado">Fiado</option></select></label><label className="field-label">Vias para imprimir<select value={receiptCopies} onChange={e => setReceiptCopies(e.target.value as 'loja' | 'loja-cliente')}><option value="loja">Somente a via da loja</option><option value="loja-cliente">Via da loja e via do cliente</option></select></label><div className="modal-actions"><button type="button" className="button-secondary" onClick={() => setReceiptSale(null)}>Cancelar impressão</button><button className="button-primary" type="submit">Imprimir comprovante</button></div></form></div>}
+    {diversosModal && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={confirmDiversos}><div className="modal-heading"><h2>Adicionar item Diversos</h2><button type="button" className="icon-button" onClick={() => setDiversosModal(false)}>×</button></div><label className="field-label">Descrição<input autoFocus required value={diversosDescription} onChange={e => setDiversosDescription(e.target.value)} placeholder="Ex.: produto sem cadastro" /></label><label className="field-label">Valor total (R$)<input required type="number" min="0.01" step="0.01" value={diversosPrice} onChange={e => setDiversosPrice(e.target.value)} placeholder="0,00" /></label><div className="modal-actions"><button type="button" className="button-secondary" onClick={() => setDiversosModal(false)}>Voltar</button><button className="button-primary" type="submit">Adicionar à venda</button></div></form></div>}
     {productModal && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={saveProduct}><div className="modal-heading"><h2>{editing ? 'Editar produto' : 'Novo produto'}</h2><button type="button" className="icon-button" onClick={() => setProductModal(false)}>×</button></div><label className="field-label">Nome<input required autoFocus value={productForm.name} onChange={e => setProductForm({...productForm,name:e.target.value})} /></label><div className="form-grid"><label className="field-label">Categoria<input value={productForm.category} onChange={e => setProductForm({...productForm,category:e.target.value})} /></label><label className="field-label">Unidade<select value={productForm.unit} onChange={e => setProductForm({...productForm,unit:e.target.value})}><option value="un">Unidade</option><option value="kg">Kg</option><option value="g">Grama</option><option value="L">Litro</option><option value="ml">Ml</option><option value="cx">Caixa</option></select></label><label className="field-label">Preço de custo (R$)<input type="number" min="0" step="0.01" value={productForm.costPrice} onChange={e => setProductForm({...productForm,costPrice:e.target.value})} placeholder="Opcional" /></label><label className="field-label">Preço de venda (R$)<input required type="number" min="0.01" step="0.01" value={productForm.salePrice} onChange={e => setProductForm({...productForm,salePrice:e.target.value})} /></label><label className="field-label">Estoque inicial/atual<input required type="number" min="0" step="1" value={productForm.stock} onChange={e => setProductForm({...productForm,stock:e.target.value})} /></label></div><div className="modal-actions"><button type="button" className="button-secondary" onClick={() => setProductModal(false)}>Voltar</button><button className="button-primary" type="submit">Salvar produto</button></div></form></div>}
     {checkout && <div className="modal-backdrop"><div className="modal checkout-modal"><div className="modal-heading"><h2>Receber pagamento</h2><button className="icon-button" onClick={() => setCheckout(false)}>×</button></div><p className="muted">Total da venda</p><div className="checkout-total">{money(total)}</div><div className="payment-lines">{checkoutPayments.map((payment, index) => <div className="payment-line" key={index}><label className="field-label">Forma<select value={payment.method} onChange={e => setCheckoutPayments(rows => rows.map((row,i) => i === index ? {...row, method:e.target.value as Payment['method']} : row))}><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select></label><label className="field-label">Valor (R$)<input type="number" min="0.01" step="0.01" value={payment.amount} onChange={e => setCheckoutPayments(rows => rows.map((row,i) => i === index ? {...row, amount:Number(e.target.value)} : row))} /></label>{checkoutPayments.length > 1 && <button className="icon-button payment-remove" onClick={() => setCheckoutPayments(rows => rows.filter((_,i) => i !== index))}>×</button>}</div>)}</div><button className="button-secondary" onClick={() => setCheckoutPayments(rows => [...rows, {method: rows.some(r=>r.method==='Pix') ? 'Débito' : 'Pix', amount: 0}])}>＋ Dividir pagamento</button><p className="muted">Valores informados: {money(checkoutPayments.reduce((sum,p)=>sum+p.amount,0))} · A soma deve ser igual ao total da venda.</p><div className="modal-actions"><button className="button-secondary" onClick={() => setCheckout(false)}>Voltar</button><button className="button-primary" onClick={() => void confirmSale()}>Confirmar venda</button></div></div></div>}
   </div>
