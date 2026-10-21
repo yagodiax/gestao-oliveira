@@ -149,7 +149,6 @@ export const store = {
       }
       const product = data.products.find(p => p.id === item.productId && p.active)
       if (!product) throw new Error('Um produto da venda não está mais disponível.')
-      if (product.stock < quantity) throw new Error('Estoque insuficiente para: ' + product.name)
       return { productId: product.id, name: product.name, quantity, unitPrice: product.salePrice, costPrice: product.costPrice }
     })
     const total = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0))
