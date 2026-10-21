@@ -8,5 +8,5 @@ contextBridge.exposeInMainWorld('loja', {
   cancelSale: (id: string) => ipcRenderer.invoke('sale:cancel', id),
   openCash: (amount: number) => ipcRenderer.invoke('cash:open', amount),
   closeCash: () => ipcRenderer.invoke('cash:close'),
-  printReceipt: (sale: unknown) => ipcRenderer.invoke('receipt:print', sale),
+  printReceipt: (sale: unknown, options: unknown) => ipcRenderer.invoke('receipt:print', { sale, ...((options && typeof options === 'object') ? options : {}) }),
 })
