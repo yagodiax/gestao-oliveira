@@ -54,3 +54,5 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .cash-payment-breakdown{display:flex;flex-wrap:wrap;gap:8px 16px;color:#a4a69e;font-size:10px}
 .cash-payment-breakdown strong{color:#e7e8e2}
 @media(max-width:650px){.cash-live-grid{grid-template-columns:1fr}.cash-history-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cash-history-head{align-items:flex-start}}
+
+/* resumo diario do caixa: historico de fechamento */

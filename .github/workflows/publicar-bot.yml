@@ -27,7 +27,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Buscar branch de desenvolvimento
-        run: git fetch origin bot-staging
+        run: |
+          git fetch origin bot-staging
+          echo "STAGING_SHA=$(git rev-parse origin/bot-staging)" >> "$GITHUB_ENV"
 
       - name: Aplicar somente arquivos alterados na branch de desenvolvimento
         shell: bash
