@@ -25,6 +25,7 @@ function App() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [checkout, setCheckout] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('Dinheiro')
+  const [checkoutPayments, setCheckoutPayments] = useState<Payment[]>([])
   const [openingAmount, setOpeningAmount] = useState('0')
   const [productForm, setProductForm] = useState({ name: '', category: 'Geral', costPrice: '', salePrice: '', stock: '0', unit: 'un' })
 
@@ -96,13 +97,13 @@ function App() {
 
   const finalize = async () => {
     if (cart.length === 0) return
+    setCheckoutPayments([{ method: paymentMethod, amount: total }])
     setCheckout(true)
   }
 
   const confirmSale = async () => {
-    const payment: Payment[] = [{ method: paymentMethod, amount: total }]
     try {
-      await window.loja.finalizeSale({ items: cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })), payments: payment })
+      await window.loja.finalizeSale({ items: cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })), payments: checkoutPayments })
       setCart([]); setCheckout(false); setPage('Vendas'); setNotice('Venda registrada com sucesso.'); setError('')
       await refresh()
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível registrar a venda.'); setNotice('') }
@@ -140,7 +141,7 @@ function App() {
       </section>
     </main>
     {productModal && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={saveProduct}><div className="modal-heading"><h2>{editing ? 'Editar produto' : 'Novo produto'}</h2><button type="button" className="icon-button" onClick={() => setProductModal(false)}>×</button></div><label className="field-label">Nome<input required autoFocus value={productForm.name} onChange={e => setProductForm({...productForm,name:e.target.value})} /></label><div className="form-grid"><label className="field-label">Categoria<input value={productForm.category} onChange={e => setProductForm({...productForm,category:e.target.value})} /></label><label className="field-label">Unidade<select value={productForm.unit} onChange={e => setProductForm({...productForm,unit:e.target.value})}><option value="un">Unidade</option><option value="kg">Kg</option><option value="g">Grama</option><option value="L">Litro</option><option value="ml">Ml</option><option value="cx">Caixa</option></select></label><label className="field-label">Preço de custo (R$)<input type="number" min="0" step="0.01" value={productForm.costPrice} onChange={e => setProductForm({...productForm,costPrice:e.target.value})} placeholder="Opcional" /></label><label className="field-label">Preço de venda (R$)<input required type="number" min="0.01" step="0.01" value={productForm.salePrice} onChange={e => setProductForm({...productForm,salePrice:e.target.value})} /></label><label className="field-label">Estoque inicial/atual<input required type="number" min="0" step="1" value={productForm.stock} onChange={e => setProductForm({...productForm,stock:e.target.value})} /></label></div><div className="modal-actions"><button type="button" className="button-secondary" onClick={() => setProductModal(false)}>Voltar</button><button className="button-primary" type="submit">Salvar produto</button></div></form></div>}
-    {checkout && <div className="modal-backdrop"><div className="modal checkout-modal"><div className="modal-heading"><h2>Receber pagamento</h2><button className="icon-button" onClick={() => setCheckout(false)}>×</button></div><p className="muted">Total da venda</p><div className="checkout-total">{money(total)}</div><label className="field-label">Forma de pagamento<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as Payment['method'])}><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select></label><p className="muted">Nesta primeira versão, a venda usa uma forma de pagamento. Pagamento dividido será habilitado na próxima etapa.</p><div className="modal-actions"><button className="button-secondary" onClick={() => setCheckout(false)}>Voltar</button><button className="button-primary" onClick={() => void confirmSale()}>Confirmar venda</button></div></div></div>}
+    {checkout && <div className="modal-backdrop"><div className="modal checkout-modal"><div className="modal-heading"><h2>Receber pagamento</h2><button className="icon-button" onClick={() => setCheckout(false)}>×</button></div><p className="muted">Total da venda</p><div className="checkout-total">{money(total)}</div><div className="payment-lines">{checkoutPayments.map((payment, index) => <div className="payment-line" key={index}><label className="field-label">Forma<select value={payment.method} onChange={e => setCheckoutPayments(rows => rows.map((row,i) => i === index ? {...row, method:e.target.value as Payment['method']} : row))}><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select></label><label className="field-label">Valor (R$)<input type="number" min="0.01" step="0.01" value={payment.amount} onChange={e => setCheckoutPayments(rows => rows.map((row,i) => i === index ? {...row, amount:Number(e.target.value)} : row))} /></label>{checkoutPayments.length > 1 && <button className="icon-button payment-remove" onClick={() => setCheckoutPayments(rows => rows.filter((_,i) => i !== index))}>×</button>}</div>)}</div><button className="button-secondary" onClick={() => setCheckoutPayments(rows => [...rows, {method: rows.some(r=>r.method==='Pix') ? 'Débito' : 'Pix', amount: 0}])}>＋ Dividir pagamento</button><p className="muted">Valores informados: {money(checkoutPayments.reduce((sum,p)=>sum+p.amount,0))} · A soma deve ser igual ao total da venda.</p><div className="modal-actions"><button className="button-secondary" onClick={() => setCheckout(false)}>Voltar</button><button className="button-primary" onClick={() => void confirmSale()}>Confirmar venda</button></div></div></div>}
   </div>
 }
 
