@@ -99,21 +99,34 @@ function App() {
     setCheckout(true)
   }
 
+  const askReceiptOptions = () => {
+    const customerName = window.prompt('Nome do cliente para o comprovante:')
+    if (customerName === null) return null
+    const isFiado = window.confirm('Essa venda é FIADO?\\nOK = Sim · Cancelar = Não')
+    const copies = window.confirm('Imprimir uma via da loja E outra do cliente?\\nOK = Loja + cliente · Cancelar = Só a loja') ? 'loja-cliente' as const : 'loja' as const
+    return { customerName: customerName.trim() || 'Não informado', isFiado, copies }
+  }
+
   const confirmSale = async () => {
     try {
       const sale = await window.loja.finalizeSale({ items: cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })), payments: checkoutPayments })
       setCart([]); setCheckout(false); setPage('Vendas'); setNotice('Venda registrada com sucesso.'); setError('')
       await refresh()
-      if (window.confirm('Venda registrada! Deseja imprimir o comprovante da Mercearia Oliveira?')) {
-        const result = await window.loja.printReceipt(sale)
+      if (window.confirm('Venda registrada! Deseja imprimir o comprovante?')) {
+        const options = askReceiptOptions()
+        if (!options) { setNotice('Venda registrada. Impressão cancelada.'); return }
+        const result = await window.loja.printReceipt(sale, options)
         if (!result.success) setError('Venda salva, mas não foi possível imprimir: ' + (result.error || 'verifique a impressora.'))
+        else setNotice('Comprovante enviado para impressão.')
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível registrar a venda.'); setNotice('') }
   }
 
   const printSale = async (sale: Sale) => {
     try {
-      const result = await window.loja.printReceipt(sale)
+      const options = askReceiptOptions()
+      if (!options) return
+      const result = await window.loja.printReceipt(sale, options)
       if (result.success) { setNotice('Comprovante da venda #' + sale.number + ' enviado para impressão.'); setError('') }
       else { setError('Não foi possível imprimir: ' + (result.error || 'verifique a impressora.')); setNotice('') }
     } catch (e) {
