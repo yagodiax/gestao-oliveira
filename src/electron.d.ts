@@ -11,7 +11,7 @@ declare global {
       finalizeSale: (input: { items: { productId: string | null; name?: string; quantity: number; unitPrice?: number; description?: string }[]; payments: Payment[] }) => Promise<Sale>
       cancelSale: (id: string) => Promise<Sale>
       openCash: (openingAmount: number) => Promise<CashSession>
-      closeCash: () => Promise<{ session: CashSession; salesCount: number; salesTotal: number; byPayment: Record<Payment['method'], number> }>
+      closeCash: () => Promise<{ session: CashSession; salesCount: number; salesTotal: number; estimatedCost: number; estimatedProfit: number; byPayment: Record<Payment['method'], number> }>
       printReceipt: (sale: Sale) => Promise<{ success: boolean; error?: string }>
     }
   }
