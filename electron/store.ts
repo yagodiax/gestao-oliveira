@@ -54,7 +54,26 @@ async function readData(): Promise<StoreData> {
 
 async function writeData(data: StoreData) {
   const target = filePath()
-  await fs.mkdir(path.dirname(target), { recursive: true })
+  const directory = path.dirname(target)
+  await fs.mkdir(directory, { recursive: true })
+
+  // Guarda uma cópia do estado anterior antes de substituir o arquivo principal.
+  try {
+    await fs.access(target)
+    const backupDirectory = path.join(directory, 'backups')
+    await fs.mkdir(backupDirectory, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    await fs.copyFile(target, path.join(backupDirectory, `gestao-oliveira-${stamp}.json`))
+    const backups = (await fs.readdir(backupDirectory))
+      .filter(name => name.startsWith('gestao-oliveira-') && name.endsWith('.json'))
+      .sort()
+    for (const oldBackup of backups.slice(0, Math.max(0, backups.length - 7))) {
+      await fs.unlink(path.join(backupDirectory, oldBackup))
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+
   const temporary = target + '.tmp'
   await fs.writeFile(temporary, JSON.stringify(data, null, 2), 'utf8')
   await fs.rename(temporary, target)
