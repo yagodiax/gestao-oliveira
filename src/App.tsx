@@ -24,7 +24,6 @@ function App() {
   const [productModal, setProductModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [checkout, setCheckout] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('Dinheiro')
   const [checkoutPayments, setCheckoutPayments] = useState<Payment[]>([])
   const [openingAmount, setOpeningAmount] = useState('0')
   const [productForm, setProductForm] = useState({ name: '', category: 'Geral', costPrice: '', salePrice: '', stock: '0', unit: 'un' })
@@ -97,7 +96,7 @@ function App() {
 
   const finalize = async () => {
     if (cart.length === 0) return
-    setCheckoutPayments([{ method: paymentMethod, amount: total }])
+    setCheckoutPayments([{ method: 'Dinheiro', amount: total }])
     setCheckout(true)
   }
 
